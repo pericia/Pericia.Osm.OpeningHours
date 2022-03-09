@@ -29,13 +29,13 @@ namespace Pericia.Osm.OpeningHours.Tests
         [Fact]
         public void TestOneTimeRange()
         {
-            var parsed = ParseTimeDomain("Mo-Fr 08:00-18:00");
+            var parsed = ParseTimeDomain("Mo 08:00-18:00");
 
             Assert.Single(parsed.ruleSequence());
 
             var singleSequence = parsed.ruleSequence()[0];
 
-            //Assert.Null(singleSequence.ruleModifier());
+            Assert.Null(singleSequence.ruleModifier());
 
             var selectorSequence = singleSequence.selectorSequence();
             Assert.Null(selectorSequence.twentyFourSeven());
@@ -43,13 +43,33 @@ namespace Pericia.Osm.OpeningHours.Tests
             Assert.NotNull(selectorSequence.smallRangeSelectors());
 
             var smallRangeSelectors = selectorSequence.smallRangeSelectors();
+            var weekDayRange = smallRangeSelectors.weekdaySelector()?.weekdaySequence()?.weekdayRange();
 
+            Assert.NotNull(weekDayRange);
+            Assert.Single(weekDayRange);
 
-            
-            //Assert.Single(smallRangeSelectors.weekdaySelector());
-            //Assert.Single(smallRangeSelectors.timeRangeSelector());
+            var wdays = weekDayRange[0].wday();
+            Assert.NotNull(wdays);
+            Assert.Single(wdays);
 
+            var monday = wdays[0];
+            Assert.Equal("Mo", monday.GetText());
 
+            var timeRange = smallRangeSelectors.timeSelector();
+            Assert.NotNull(timeRange);
+
+            var timespans = timeRange.timespan();
+            Assert.NotNull(timespans);
+            Assert.Single(timespans);
+
+            var timespan = timespans[0];
+            var openTime = timespan.time();
+            var closeTime = timespan.extendedTime();
+
+            Assert.Equal("08", openTime.hourMinutes().hour().GetText());
+            Assert.Equal("00", openTime.hourMinutes().minute().GetText());
+            Assert.Equal("18", closeTime.extendedHourMinutes().extendedHour().GetText());
+            Assert.Equal("00", closeTime.extendedHourMinutes().minute().GetText());
         }
 
         static TimeDomainContext ParseTimeDomain(string input)
@@ -72,13 +92,13 @@ namespace Pericia.Osm.OpeningHours.Tests
 
             return tree;
         }
-        
-            
+
+
     }
     internal class ErrorListener<T> : IAntlrErrorListener<T>
     {
         public bool had_error;
-        
+
         public void SyntaxError(TextWriter output, IRecognizer recognizer, T offendingSymbol, int line, int charPositionInLine, string msg, RecognitionException e)
         {
             had_error = true;
