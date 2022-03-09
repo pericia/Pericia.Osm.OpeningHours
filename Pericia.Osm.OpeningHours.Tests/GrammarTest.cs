@@ -1,5 +1,4 @@
 using Antlr4.Runtime;
-using Pericia.Osm.OpeningHours;
 using System;
 using System.IO;
 using Xunit;
@@ -9,10 +8,11 @@ namespace Pericia.Osm.OpeningHours.Tests
 {
     public class GrammarTest
     {
-        [Fact]
-        public void Test24_7()
+        [Theory]
+        [InlineData("24/7")]
+        public void Open24_7(string input)
         {
-            var parsed = ParseTimeDomain("24/7");
+            var parsed = ParseTimeDomain(input);
 
             Assert.Single(parsed.ruleSequence());
 
@@ -26,10 +26,11 @@ namespace Pericia.Osm.OpeningHours.Tests
             Assert.Null(selectorSequence.smallRangeSelectors());
         }
 
-        [Fact]
-        public void TestOneTimeRange()
+        [Theory]
+        [InlineData("Mo-Fr 08:00-17:30")]
+        public void OpenOnWeekDays(string input)
         {
-            var parsed = ParseTimeDomain("Mo 08:00-18:00");
+            var parsed = ParseTimeDomain(input);
 
             Assert.Single(parsed.ruleSequence());
 
@@ -50,10 +51,12 @@ namespace Pericia.Osm.OpeningHours.Tests
 
             var wdays = weekDayRange[0].wday();
             Assert.NotNull(wdays);
-            Assert.Single(wdays);
+            Assert.Equal(2, wdays.Length);
 
             var monday = wdays[0];
             Assert.Equal("Mo", monday.GetText());
+            var friday = wdays[1];
+            Assert.Equal("Fr", friday.GetText());
 
             var timeRange = smallRangeSelectors.timeSelector();
             Assert.NotNull(timeRange);
@@ -68,8 +71,83 @@ namespace Pericia.Osm.OpeningHours.Tests
 
             Assert.Equal("08", openTime.hourMinutes().hour().GetText());
             Assert.Equal("00", openTime.hourMinutes().minute().GetText());
-            Assert.Equal("18", closeTime.extendedHourMinutes().extendedHour().GetText());
-            Assert.Equal("00", closeTime.extendedHourMinutes().minute().GetText());
+            Assert.Equal("17", closeTime.extendedHourMinutes().extendedHour().GetText());
+            Assert.Equal("30", closeTime.extendedHourMinutes().minute().GetText());
+        }
+
+        [Theory]
+        [InlineData("Mo-Fr 08:00-12:00,13:00-17:30")]
+        [InlineData("Mo-Fr 08:00-12:00, 13:00-17:30")]
+        public void MultipleOpeningIntervals(string input)
+        {
+            var parsed = ParseTimeDomain(input);
+
+            Assert.Single(parsed.ruleSequence());
+
+            var singleSequence = parsed.ruleSequence()[0];
+
+            var smallRangeSelectors = singleSequence.selectorSequence().smallRangeSelectors();
+
+            var timeRange = smallRangeSelectors.timeSelector();
+            Assert.NotNull(timeRange);
+
+            var timespans = timeRange.timespan();
+            Assert.NotNull(timespans);
+            Assert.Equal(2, timespans.Length);
+
+            var morning = timespans[0];
+            Assert.Equal("08", morning.time().hourMinutes().hour().GetText());
+            Assert.Equal("00", morning.time().hourMinutes().minute().GetText());
+            Assert.Equal("12", morning.extendedTime().extendedHourMinutes().extendedHour().GetText());
+            Assert.Equal("00", morning.extendedTime().extendedHourMinutes().minute().GetText());
+
+            var afternoon = timespans[1];
+            Assert.Equal("13", afternoon.time().hourMinutes().hour().GetText());
+            Assert.Equal("00", afternoon.time().hourMinutes().minute().GetText());
+            Assert.Equal("17", afternoon.extendedTime().extendedHourMinutes().extendedHour().GetText());
+            Assert.Equal("30", afternoon.extendedTime().extendedHourMinutes().minute().GetText());
+        }
+
+        [Theory]
+        [InlineData("Mo-Tu 08:00-17:30; Fr 08:00-12:00")]
+        public void MultipleOpeningRules(string input)
+        {
+            var parsed = ParseTimeDomain(input);
+
+            Assert.Equal(2, parsed.ruleSequence().Length);
+
+            var firstRule = parsed.ruleSequence()[0].selectorSequence();
+
+            var smallRangeSelectors = firstRule.smallRangeSelectors();
+            var weekDayRange = smallRangeSelectors.weekdaySelector()?.weekdaySequence()?.weekdayRange();
+
+            Assert.NotNull(weekDayRange);
+            Assert.Single(weekDayRange);
+
+            var wdays = weekDayRange[0].wday();
+            Assert.NotNull(wdays);
+            Assert.Equal(2, wdays.Length);
+
+            var monday = wdays[0];
+            Assert.Equal("Mo", monday.GetText());
+            var tuesday = wdays[1];
+            Assert.Equal("Tu", tuesday.GetText());
+
+
+            var secondRule = parsed.ruleSequence()[1].selectorSequence();
+
+            smallRangeSelectors = secondRule.smallRangeSelectors();
+            weekDayRange = smallRangeSelectors.weekdaySelector()?.weekdaySequence()?.weekdayRange();
+
+            Assert.NotNull(weekDayRange);
+            Assert.Single(weekDayRange);
+
+            wdays = weekDayRange[0].wday();
+            Assert.NotNull(wdays);
+            Assert.Single(wdays);
+
+            var friday = wdays[0];
+            Assert.Equal("Fr", friday.GetText());
         }
 
         static TimeDomainContext ParseTimeDomain(string input)

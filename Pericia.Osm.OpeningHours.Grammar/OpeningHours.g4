@@ -37,7 +37,7 @@ smallRangeSelectors : weekdaySelector? SPACE? timeSelector? ;
 separatorForReadability : ':' ;
 
 // Time selector
-timeSelector : timespan (',' timespan)* ;
+timeSelector : timespan (',' SPACE? timespan)* ;
 timespan : time
 		 | time '+'
 		 | time '-' extendedTime '+'
